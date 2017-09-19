@@ -9,6 +9,7 @@ import os
 
 FROM_HEADER = "From "
 FROM_DASH_HEADER = "From -"
+FIXED_FILE_SUFFIX = "_fixed"
 ENCODING_UTF8 = "utf-8"
 ENCODING_FALLBACK = "windows-1252"
 
@@ -46,7 +47,7 @@ def encoding_error_handler(err):
         ENCODING_UTF8).decode(ENCODING_UTF8)
     hexOut = ":".join("{:02x}".format(ord(c)) for c in repl)
 
-    print "  Encoding Error: Bytes in", hexIn, "out", hexOut, "human", repl
+    print u"  Encoding Error. flagged bytes='{}', corrected bytes='{}', printed='{}'".format(hexIn, hexOut, repl)
     return (repl, err.end)
 
 
@@ -59,28 +60,30 @@ def is_target_from_line(line):
 
 
 parser = argparse.ArgumentParser(
-    description='Read an mbox file and try to escape runaway "From " lines')
-parser.add_argument('--input',
+    description="""Read an mbox file and try to escape runaway "From " lines.\n
+    The original file is NOT altered, but new file, suffixed with '{}', will be created in the same directory.\n
+    If the new file is the same as the old one, it will be transparently deleted.""".format(FIXED_FILE_SUFFIX))
+parser.add_argument('-i', '--input',
                     help='The mbox file to read',
                     dest='input',
                     required=True)
-parser.add_argument('--encoding-fallback',
+parser.add_argument('-e', '--encoding-fallback',
                     help='If reading a line using {} fails, try to recover using {}'.format(
                         ENCODING_UTF8, ENCODING_FALLBACK),
                     dest='encoding_fallback',
                     action="store_true")
 args = parser.parse_args()
 
-out_filename = args.input + "_fixed"
+out_filename = args.input + FIXED_FILE_SUFFIX
 
-print "Reading:", args.input
-print "Will save as:", out_filename
+print "* Input :", args.input
+print "* Output:", out_filename
 
 if args.encoding_fallback:
-    print "Will try to recover encoding errors using " + ENCODING_FALLBACK
+    print "* Will try to recover encoding errors using " + ENCODING_FALLBACK
     codecs.register_error("encoding_error_handler", encoding_error_handler)
 else:
-    print "Will NOT try to recover encoding errors"
+    print "* Will NOT try to recover encoding errors"
 
 out_file = open(out_filename, 'w')
 with codecs.open(args.input, 'r', encoding=ENCODING_UTF8, errors='encoding_error_handler') as f:
@@ -89,7 +92,7 @@ with codecs.open(args.input, 'r', encoding=ENCODING_UTF8, errors='encoding_error
         # print line_number, line.rstrip()
         encoded_line = line.encode(ENCODING_UTF8)
         if is_target_from_line(encoded_line):
-            print "  Escaping:", line_number, encoded_line.rstrip()
+            print u"  Escaping line:{} content='{}'".format(line_number, encoded_line.rstrip())
             out_file.write(">" + encoded_line)
         else:
             out_file.write(encoded_line)
